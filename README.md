@@ -5,6 +5,7 @@
 # 启动方法
 
 在client文件夹下输入go run main.go
+
 然后在server文件夹下输出go run main.go即可
 
 # 实现完滑动窗口后进一步提升

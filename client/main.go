@@ -73,7 +73,7 @@ func getFileSize(server string) int64 {
 	}
 }
 
-func requestFileBlock(region, totalBlock int64, file *os.File, server string, windowChannel chan int64) {
+func requestFileBlock(region, totalBlock int64, file *os.File, server string) {
 	for blockId := region; blockId < totalBlock; blockId += Concurrency {
 		startFile, endFile := blockId*FileBlockSize, (blockId+1)*FileBlockSize
 		data := requestFileContent(startFile, endFile, file, server)
@@ -86,7 +86,7 @@ func requestFileContent(start, end int64, file *os.File, server string) []byte {
 	fileReq := common.FileRequest{Start: start, End: end}
 	responseChan := make(chan common.FileResponse, 1)
 	for {
-		timer := time.NewTimer(time.Duration(time.Millisecond * 500))
+		timer := time.NewTimer(time.Duration(time.Millisecond * 1000))
 		go func() {
 			data := sendRequest(fileReq, server)
 			responseChan <- data
@@ -120,9 +120,8 @@ func saveFile(savePath string, server string) {
 	totalBlock := fileSize / FileBlockSize
 	windowSize := min(totalBlock, Concurrency)
 	wg.Add(1)
-	windowChannel := make(chan int64, windowSize)
 	for i := int64(0); i < windowSize; i++ {
-		go requestFileBlock(i, totalBlock, file, server, windowChannel)
+		go requestFileBlock(i, totalBlock, file, server)
 	}
 	wg.Wait()
 

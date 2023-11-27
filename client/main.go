@@ -76,13 +76,13 @@ func getFileSize(server string) int64 {
 func requestFileBlock(region, totalBlock int64, file *os.File, server string) {
 	for blockId := region; blockId < totalBlock; blockId += Concurrency {
 		startFile, endFile := blockId*FileBlockSize, (blockId+1)*FileBlockSize
-		data := requestFileContent(startFile, endFile, file, server)
+		data := requestFileContent(startFile, endFile, server)
 		go saveFileBlock(startFile, endFile, totalBlock, file, data)
 		log.Printf("Requested file block finished: %d\n", blockId)
 	}
 }
 
-func requestFileContent(start, end int64, file *os.File, server string) []byte {
+func requestFileContent(start, end int64, server string) []byte {
 	fileReq := common.FileRequest{Start: start, End: end}
 	responseChan := make(chan common.FileResponse, 1)
 	for {
@@ -97,7 +97,7 @@ func requestFileContent(start, end int64, file *os.File, server string) []byte {
 		case <-timer.C:
 			retriedCount.Add(1)
 			log.Printf("File content request timed out, retrying, total Retries(%d)", retriedCount)
-			return requestFileContent(start, end, file, server)
+			continue
 		}
 	}
 }
@@ -118,16 +118,16 @@ func saveFile(savePath string, server string) {
 	fileSize := getFileSize(server)
 	file, _ := os.OpenFile(savePath, os.O_RDWR|os.O_CREATE, os.ModePerm)
 	totalBlock := fileSize / FileBlockSize
-	windowSize := min(totalBlock, Concurrency)
+	actualConcurrency := min(totalBlock, Concurrency)
 	wg.Add(1)
-	for i := int64(0); i < windowSize; i++ {
+	for i := int64(0); i < actualConcurrency; i++ {
 		go requestFileBlock(i, totalBlock, file, server)
 	}
 	wg.Wait()
 
 	if fileSize%FileBlockSize != 0 {
 		startOffset := fileSize - fileSize%FileBlockSize
-		data := requestFileContent(startOffset, fileSize, file, server)
+		data := requestFileContent(startOffset, fileSize, server)
 		saveFileBlock(startOffset, fileSize, totalBlock, file, data)
 	}
 
